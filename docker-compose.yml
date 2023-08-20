@@ -3,18 +3,71 @@ version: '3.6'
 services:
 
   rabbitmq:
-    image: rabbitmq:3.7-management
+    # changed the image bc it wasn't working 
+    image: rabbitmq:3
     container_name: rabbitmq
     hostname: rabbitmq
     ports:
       - "7000:15672"
       - "7001:5672"
-    environment:
-      - RABBITMQ_DEFAULT_USER=user
-      - RABBITMQ_DEFAULT_PASS=password
+    networks:
+      - nett
+
 
   redis:
     image: redis:5-alpine
+    container_name: redis
     ports:
       - 6379:6379
     restart: always
+    networks:
+      - nett
+
+  api:
+    container_name: api 
+    # quick fix to make the container restart to avoid a start before rabbitmq is ready.
+    # check why depends on doesn't work as expected
+    # https://stackoverflow.com/a/35170810
+    restart: always
+    build:
+      context: .
+      dockerfile: dockerfiles/api.Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - rabbitmq
+    links: 
+      - rabbitmq
+    networks:
+      - nett
+
+  report:
+    container_name: report 
+    restart: always
+    build:
+      context: .
+      dockerfile: dockerfiles/report.Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+    networks:
+      - nett
+
+  processor:
+    container_name: processor 
+    restart: always
+    build:
+      context: .
+      dockerfile: dockerfiles/processor.Dockerfile
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - nett
+
+
+networks:
+  nett:
+    name: nett-test
+    driver: bridge
